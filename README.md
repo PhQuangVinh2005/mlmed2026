@@ -1,6 +1,7 @@
-USTH Machine Learning in Medicine 2026
-==================================
+USTH DS - Machine Learning in Medicine 2025
+===============================================
 
-* Your name here
-* Your ID here
-* Your team ID here
+- Student name: *Phạm Quang Vinh*
+- Student ID: *23BI14455*
+
+
