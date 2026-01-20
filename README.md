@@ -1,4 +1,4 @@
-USTH DS - Machine Learning in Medicine 2025
+USTH DS - Machine Learning in Medicine 2026
 ===============================================
 
 - Student name: *Phạm Quang Vinh*
