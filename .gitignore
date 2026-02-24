@@ -1,6 +1,11 @@
+/.vscode
 /lab1/data
+/lab2/data
+/lab2/figures
+/lab3/archive
 /model_weights
 *.aux
 *.log
 *.pth
 .env
+.txt

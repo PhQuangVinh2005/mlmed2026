@@ -1,0 +1,139 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Fetal Head Circumference Measurement from Ultrasound Images}
+\author{Lab Report}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This study explores automated fetal head circumference (HC) measurement from 2D ultrasound images using the HC18 dataset. We compare three approaches: classical image processing with OpenCV ellipse fitting, Random Forest regression, and U-Net deep learning segmentation with different loss functions. The OpenCV baseline achieves 0.71mm MAE by directly fitting ellipses to annotations. Random Forest regression achieves 4.18mm MAE using extracted features. For U-Net segmentation, we compare MSE, BCE, and BCE+IoU loss functions, finding that BCE+IoU loss is essential for learning meaningful segmentation masks.
+\end{abstract}
+
+\section{Introduction}
+Fetal head circumference measurement is essential for monitoring fetal growth during pregnancy. Manual measurement from ultrasound images is time-consuming and subject to inter-observer variability. This work explores automated approaches using the HC18 dataset, which contains ultrasound images with annotated ellipses marking the fetal head.
+
+\section{Exploratory Data Analysis}
+
+The HC18 dataset contains 999 training images with ground truth annotations and 335 test images. Each image has an associated pixel size (mm/pixel) for converting measurements to real-world units.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\columnwidth]{figures/HC_distribution.pdf}
+    \caption{Distribution of head circumference values and pixel sizes in the training set.}
+    \label{fig:hc_dist}
+\end{figure}
+
+The HC values range from 44mm to 330mm with a mean of 197mm (Fig.~\ref{fig:hc_dist}). Sample images show the ultrasound scans with corresponding ellipse annotations (Fig.~\ref{fig:samples}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\columnwidth]{figures/sample_images.pdf}
+    \caption{Sample ultrasound images (top) with annotations (bottom).}
+    \label{fig:samples}
+\end{figure}
+
+\section{Methods}
+
+\subsection{OpenCV Ellipse Fitting (Baseline)}
+The annotation images contain white ellipse outlines. We extract the ellipse using contour detection and fit an ellipse with \texttt{cv2.fitEllipse()}. The circumference is calculated using Ramanujan's approximation:
+\begin{equation}
+C \approx \pi(a+b)\left(1 + \frac{3h}{10 + \sqrt{4-3h}}\right)
+\end{equation}
+where $h = \frac{(a-b)^2}{(a+b)^2}$ and $a$, $b$ are semi-major and semi-minor axes.
+
+\subsection{Random Forest Regression}
+Features extracted from annotations include ellipse dimensions (width, height), aspect ratio, contour area, perimeter, center position, and pixel intensity statistics (mean, std). A Random Forest regressor with 100 trees predicts HC directly from these 10 features.
+
+\subsection{U-Net Segmentation}
+We implement a 3-level U-Net architecture for semantic segmentation of the fetal head region. The encoder uses convolutional blocks with channels 32, 64, 128, and 256 (bottleneck). Each block consists of two 3$\times$3 convolutions with batch normalization and ReLU activation. The decoder uses transposed convolutions for upsampling with skip connections from the encoder.
+
+We compare three loss functions:
+\begin{itemize}
+    \item \textbf{MSE Loss}: Mean squared error between predicted and ground truth masks.
+    \item \textbf{BCE Loss}: Binary cross-entropy for pixel-wise classification.
+    \item \textbf{BCE + IoU Loss}: Combination of BCE and Intersection-over-Union loss with $\alpha = 0.5$:
+    \begin{equation}
+    \mathcal{L} = 0.5 \cdot \mathcal{L}_{BCE} + 0.5 \cdot \mathcal{L}_{IoU}
+    \end{equation}
+\end{itemize}
+
+After segmentation, HC is computed from predicted masks using ellipse fitting and Ramanujan's formula.
+
+\section{Results}
+
+Table~\ref{tab:results} summarizes the performance of all methods on the validation set (20\% of training data).
+
+\begin{table}[h]
+\centering
+\caption{Model Performance Comparison}
+\label{tab:results}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Method & MAE (mm) & IoU \\ \midrule
+OpenCV Ellipse Fitting & 0.71 & -- \\
+Random Forest Regression & 4.18 & -- \\ \midrule
+U-Net (MSE Loss) & -- & 0.00 \\
+U-Net (BCE Loss) & -- & 0.00 \\
+U-Net (BCE + IoU Loss) & 62.16 & 0.14 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+The OpenCV baseline achieves the lowest MAE (0.71mm) because it directly measures the annotated ellipse, closely matching the ground truth calculation. Random Forest regression (Fig.~\ref{fig:rf}) achieves 4.18mm MAE, showing that learned features can approximate HC measurement with reasonable accuracy.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\columnwidth]{figures/random_forest.pdf}
+    \caption{Random Forest: predicted vs true HC and error distribution.}
+    \label{fig:rf}
+\end{figure}
+
+\subsection{U-Net Segmentation Results}
+
+Fig.~\ref{fig:loss_curves} shows the training and validation loss curves for all three loss functions. The MSE and BCE losses converge quickly but fail to produce meaningful segmentations, as shown by their IoU scores of 0. This is because these losses do not directly optimize for overlap between predicted and ground truth regions.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{figures/loss_curves.pdf}
+    \caption{Training loss curves for U-Net with (a) MSE, (b) BCE, and (c) BCE+IoU loss functions.}
+    \label{fig:loss_curves}
+\end{figure}
+
+Only the BCE+IoU loss produces valid segmentation masks that can be used for HC measurement. Fig.~\ref{fig:predictions} shows sample predictions comparing all three loss functions. The BCE+IoU model learns to segment the fetal head region, though with room for improvement.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\columnwidth]{figures/prediction_1.pdf}
+    \caption{Sample predictions: ultrasound image, ground truth mask, and predicted masks from BCE, BCE+IoU, and MSE loss models.}
+    \label{fig:predictions}
+\end{figure}
+
+Fig.~\ref{fig:hc_comparison} shows the scatter plot of predicted vs true HC values for the BCE+IoU model.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\columnwidth]{figures/hc_comparison.pdf}
+    \caption{Predicted vs true HC for U-Net with BCE+IoU loss.}
+    \label{fig:hc_comparison}
+\end{figure}
+
+\section{Discussion}
+
+The choice of loss function significantly impacts U-Net segmentation quality. MSE and BCE losses optimize pixel-wise accuracy but can converge to trivial solutions (e.g., predicting all zeros) when class imbalance is severe. The IoU loss directly optimizes for region overlap, forcing the model to learn meaningful segmentation masks.
+
+The relatively high MAE (62.16mm) of the BCE+IoU model suggests that while the model learns to identify the head region, the predicted masks are not precise enough for accurate circumference calculation. This could be improved by:
+\begin{itemize}
+    \item Training for more epochs
+    \item Using data augmentation
+    \item Increasing model capacity
+    \item Adding Dice loss for better boundary delineation
+\end{itemize}
+
+\section{Conclusion}
+This study demonstrates that classical image processing with ellipse fitting provides highly accurate HC measurement (0.71mm MAE) when annotations are available. Random Forest regression offers a machine learning alternative with 4.18mm MAE. For deep learning segmentation, the choice of loss function is critical---BCE+IoU loss is necessary to learn meaningful segmentations, while pure MSE or BCE losses fail to produce valid masks. Future work should focus on improving U-Net segmentation accuracy through longer training, data augmentation, and architecture refinements.
+
+\end{document}
