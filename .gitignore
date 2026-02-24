@@ -7,5 +7,6 @@
 *.aux
 *.log
 *.pth
+*.png
+*.txt
 .env
-.txt
